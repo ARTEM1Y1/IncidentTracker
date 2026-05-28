@@ -67,7 +67,7 @@ namespace IncidentTracker.Data
             cmd.ExecuteNonQuery();
         }
 
-        //Incidents 
+        //incidents 
 
         public List<Incident> GetAllIncidents(string? search = null, IncidentStatus? status = null, string? assignedTo = null)
         {
@@ -179,7 +179,7 @@ namespace IncidentTracker.Data
             Status = (IncidentStatus)r.GetInt32(11)
         };
 
-        //History
+        //history
 
         public void AddHistory(HistoryEntry entry)
         {
@@ -216,7 +216,7 @@ namespace IncidentTracker.Data
             return list;
         }
 
-        // ---- Comments ----
+        // comments
 
         public void AddComment(Comment comment)
         {
@@ -249,7 +249,7 @@ namespace IncidentTracker.Data
             return list;
         }
 
-        // ---- Attachments ----
+        // attachments
 
         public void AddAttachment(Attachment attachment)
         {
@@ -293,7 +293,7 @@ namespace IncidentTracker.Data
             cmd.ExecuteNonQuery();
         }
 
-        // ---- Reports ----
+        // reports
 
         public Dictionary<string, int> GetStatusReport()
         {

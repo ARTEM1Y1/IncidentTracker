@@ -41,7 +41,6 @@ namespace IncidentTracker.Forms
             menu.Items.Add(reportMenu);
             MainMenuStrip = menu;
 
-            // Toolbar
             var toolbar = new Panel { Height = 46, Dock = DockStyle.Top, BackColor = Color.FromArgb(240, 245, 255) };
 
             var btnNew = new Button
@@ -103,7 +102,6 @@ namespace IncidentTracker.Forms
             _grid.CellDoubleClick += (s, e) => { if (e.RowIndex >= 0) OpenSelectedIncident(); };
             _grid.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter && _grid.CurrentRow != null) OpenSelectedIncident(); };
 
-            // Columns
             _grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Number",     HeaderText = "Номер",        FillWeight = 120 });
             _grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Author",     HeaderText = "Автор",        FillWeight = 100 });
             _grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Department", HeaderText = "Подразделение",FillWeight = 120 });

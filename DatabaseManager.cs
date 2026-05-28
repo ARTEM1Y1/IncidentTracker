@@ -67,7 +67,7 @@ namespace IncidentTracker.Data
             cmd.ExecuteNonQuery();
         }
 
-        //incidents 
+        // incidents 
 
         public List<Incident> GetAllIncidents(string? search = null, IncidentStatus? status = null, string? assignedTo = null)
         {
@@ -179,7 +179,7 @@ namespace IncidentTracker.Data
             Status = (IncidentStatus)r.GetInt32(11)
         };
 
-        //history
+        // history
 
         public void AddHistory(HistoryEntry entry)
         {

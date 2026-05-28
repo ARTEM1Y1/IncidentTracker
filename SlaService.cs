@@ -4,30 +4,44 @@ namespace IncidentTracker.Services
 {
     public static class SlaService
     {
-        // SLA in hours by priority
-        private static readonly Dictionary<Priority, (int Reaction, int Resolution)> SlaHours = new()
+        private static readonly Dictionary<Priority, int> ReactionHours = new()
         {
-            { Priority.Critical, (1,  4)  },
-            { Priority.High,     (4,  24) },
-            { Priority.Medium,   (8,  72) },
-            { Priority.Low,      (24, 168) }
+            { Priority.Critical, 1  },
+            { Priority.High,     4  },
+            { Priority.Medium,   8  },
+            { Priority.Low,      24 }
+        };
+
+        private static readonly Dictionary<Priority, int> ResolutionHours = new()
+        {
+            { Priority.Critical, 4   },
+            { Priority.High,     24  },
+            { Priority.Medium,   72  },
+            { Priority.Low,      168 }
         };
 
         public static (DateTime Reaction, DateTime Resolution) Calculate(Priority priority, DateTime createdAt)
         {
-            var (r, res) = SlaHours[priority];
-            return (createdAt.AddHours(r), createdAt.AddHours(res));
+            return (
+                createdAt.AddHours(ReactionHours[priority]),
+                createdAt.AddHours(ResolutionHours[priority])
+            );
         }
 
-        public static string GetSlaDescription(Priority priority)
+        public static string GetSlaDescription(Priority priority) =>
+            $"Реакция: {ReactionHours[priority]} ч.  |  Решение: {ResolutionHours[priority]} ч.";
+        public static string GetSlaCategoryLabel(Priority priority) => priority switch
         {
-            var (r, res) = SlaHours[priority];
-            return $"Реакция: {r} ч., Решение: {res} ч.";
-        }
+            Priority.Critical => "🔴 SLA: Критический (реакция 1 ч.)",
+            Priority.High     => "🟠 SLA: Высокий (реакция 4 ч.)",
+            Priority.Medium   => "🟡 SLA: Средний (реакция 8 ч.)",
+            Priority.Low      => "🟢 SLA: Низкий (реакция 24 ч.)",
+            _                 => ""
+        };
 
         public static Color GetStatusColor(Incident inc)
         {
-            if (inc.Status == IncidentStatus.Closed || inc.Status == IncidentStatus.Resolved || inc.Status == IncidentStatus.Rejected)
+            if (inc.Status is IncidentStatus.Closed or IncidentStatus.Resolved or IncidentStatus.Rejected)
                 return Color.FromArgb(220, 255, 220);
             if (inc.IsOverdue)
                 return Color.FromArgb(255, 200, 200);

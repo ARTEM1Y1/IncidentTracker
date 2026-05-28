@@ -23,7 +23,6 @@ namespace IncidentTracker.Forms
 
             var tabs = new TabControl { Dock = DockStyle.Fill };
 
-            // Status report
             var tabStatus = new TabPage("По статусам");
             var gridStatus = BuildGrid();
             gridStatus.Name = "gridStatus";
@@ -33,7 +32,6 @@ namespace IncidentTracker.Forms
             gridStatus.Columns[0].FillWeight = 200;
             gridStatus.Columns[1].FillWeight = 80;
 
-            // Category report
             var tabCat = new TabPage("По категориям");
             var gridCat = BuildGrid();
             gridCat.Name = "gridCat";
@@ -41,7 +39,6 @@ namespace IncidentTracker.Forms
             gridCat.Columns.Add("Cat", "Категория");
             gridCat.Columns.Add("Count", "Кол-во");
 
-            // Overdue report
             var tabOver = new TabPage("Просроченные");
             var gridOver = BuildGrid();
             gridOver.Name = "gridOver";
@@ -67,7 +64,6 @@ namespace IncidentTracker.Forms
             Controls.Add(tabs);
             Controls.Add(btnPanel);
 
-            // Store refs
             _gridStatus = gridStatus;
             _gridCat    = gridCat;
             _gridOver   = gridOver;

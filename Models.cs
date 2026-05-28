@@ -32,8 +32,13 @@ namespace IncidentTracker.Models
         public DateTime? ResolutionDeadline { get; set; }
         public string? AssignedTo { get; set; }
         public IncidentStatus Status { get; set; }
+
         public bool IsOverdue => ResolutionDeadline.HasValue && ResolutionDeadline.Value < DateTime.Now
             && Status != IncidentStatus.Resolved && Status != IncidentStatus.Closed && Status != IncidentStatus.Rejected;
+
+        public bool IsDescriptionLocked => Status != IncidentStatus.New;
+
+        public bool CanTransitionToClosed => Status == IncidentStatus.Resolved;
     }
 
     public class HistoryEntry
@@ -70,22 +75,22 @@ namespace IncidentTracker.Models
     {
         public static string ToRussian(IncidentStatus status) => status switch
         {
-            IncidentStatus.New => "Новый",
-            IncidentStatus.InProgress => "В работе",
+            IncidentStatus.New         => "Новый",
+            IncidentStatus.InProgress  => "В работе",
             IncidentStatus.WaitingInfo => "Ожидает информации",
-            IncidentStatus.Resolved => "Решён",
-            IncidentStatus.Closed => "Закрыт",
-            IncidentStatus.Rejected => "Отклонён",
-            _ => status.ToString()
+            IncidentStatus.Resolved    => "Решён",
+            IncidentStatus.Closed      => "Закрыт",
+            IncidentStatus.Rejected    => "Отклонён",
+            _                          => status.ToString()
         };
 
         public static string ToRussian(Priority priority) => priority switch
         {
-            Priority.Low => "Низкий",
-            Priority.Medium => "Средний",
-            Priority.High => "Высокий",
+            Priority.Low      => "Низкий",
+            Priority.Medium   => "Средний",
+            Priority.High     => "Высокий",
             Priority.Critical => "Критический",
-            _ => priority.ToString()
+            _                 => priority.ToString()
         };
     }
 }

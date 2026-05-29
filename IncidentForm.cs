@@ -10,6 +10,7 @@ namespace IncidentTracker.Forms
         private readonly Incident? _existing;
         private readonly string _currentUser = Environment.UserName;
 
+        // Controls
         private TextBox _txtNumber = null!, _txtAuthor = null!, _txtDepartment = null!;
         private ComboBox _cmbCategory = null!, _cmbPriority = null!, _cmbStatus = null!, _cmbAssigned = null!;
         private RichTextBox _txtDescription = null!;
@@ -19,7 +20,8 @@ namespace IncidentTracker.Forms
         private ListBox _lstComments = null!, _lstAttachments = null!, _lstHistory = null!;
         private TextBox _txtNewComment = null!;
         private Label _lblSla = null!;
-        private Label _lblDescLock = null!;
+        private Label _lblDescLock = null!; 
+        private bool _applyingRules = false;    
 
         private static readonly string[] Categories = { "Сеть", "ПК/Ноутбук", "Программное обеспечение", "Принтер", "Телефония", "Сервер", "Почта", "Безопасность", "Другое" };
         private static readonly string[] Assignees = { "Иванов И.И.", "Петров П.П.", "Сидоров С.С.", "Козлов К.К.", "Новиков Н.Н." };
@@ -74,7 +76,7 @@ namespace IncidentTracker.Forms
                 _cmbStatus.Items.Add(StatusHelper.ToRussian(st));
             _cmbStatus.SelectedIndex = 0;
 
-            _cmbStatus.SelectedIndexChanged += (s, e) => ApplyBusinessRules();
+            _cmbStatus.SelectedIndexChanged += OnStatusChanged;
 
             _cmbAssigned.Items.Add("Не назначен");
             _cmbAssigned.Items.AddRange(Assignees);
@@ -219,6 +221,7 @@ namespace IncidentTracker.Forms
             return control;
         }
 
+
         private void LoadData()
         {
             if (_existing == null)
@@ -247,8 +250,10 @@ namespace IncidentTracker.Forms
             LoadAttachments();
             LoadHistory();
             UpdateSla();
-            ApplyBusinessRules();
+            ApplyBusinessRules(); // apply lock/unlock after all fields are populated
         }
+
+        // ── SLA ──────────────────────────────────────────────────────────────
 
         private void UpdateSla()
         {
@@ -256,6 +261,7 @@ namespace IncidentTracker.Forms
             _lblSla.Text = SlaService.GetSlaCategoryLabel(priority)
                          + "     " + SlaService.GetSlaDescription(priority);
 
+            // Auto-fill deadlines only for new incidents
             if (_existing == null)
             {
                 var (r, res) = SlaService.Calculate(priority, DateTime.Now);
@@ -264,32 +270,61 @@ namespace IncidentTracker.Forms
             }
         }
 
+        // ── Business rules ───────────────────────────────────────────────────
+
+        /// Named handler so it can be properly unsubscribed (lambdas create new instances each time).
+        private void OnStatusChanged(object? sender, EventArgs e) => ApplyBusinessRules();
+
+        /// <summary>
+        /// Called after every status change in the UI and on form load.
+        /// Enforces:
+        ///   1. Description is read-only once the incident is no longer "New".
+        ///   2. "Closed" is only selectable when the current saved status is "Resolved".
+        /// Uses _applyingRules guard to prevent re-entrant calls that cause StackOverflowException.
+        /// </summary>
         private void ApplyBusinessRules()
         {
-            bool descLocked = _existing != null && _existing.IsDescriptionLocked;
-            _txtDescription.ReadOnly  = descLocked;
-            _txtDescription.BackColor = descLocked ? Color.FromArgb(245, 245, 245) : Color.White;
-            _lblDescLock.Visible      = descLocked;
+            // Guard: Items.Clear() + SelectedIndex assignment fire SelectedIndexChanged again.
+            // Without this flag that causes infinite recursion → StackOverflowException.
+            if (_applyingRules) return;
+            _applyingRules = true;
 
-            var selectedText = _cmbStatus.SelectedItem?.ToString() ?? "";
-            _cmbStatus.SelectedIndexChanged -= (s, e) => ApplyBusinessRules();
-
-            _cmbStatus.Items.Clear();
-            foreach (IncidentStatus st in Enum.GetValues(typeof(IncidentStatus)))
+            try
             {
-                if (st == IncidentStatus.Closed && _existing != null && !_existing.CanTransitionToClosed)
-                    continue;
-                _cmbStatus.Items.Add(StatusHelper.ToRussian(st));
+                // ── Rule 1: lock description after "New" ──────────────────────
+                bool descLocked = _existing != null && _existing.IsDescriptionLocked;
+                _txtDescription.ReadOnly  = descLocked;
+                _txtDescription.BackColor = descLocked ? Color.FromArgb(245, 245, 245) : Color.White;
+                _lblDescLock.Visible      = descLocked;
+
+                // ── Rule 2: "Closed" only reachable from "Resolved" ───────────
+                // Rebuild the status list so that "Закрыт" is present only when allowed.
+                var selectedText = _cmbStatus.SelectedItem?.ToString() ?? "";
+
+                _cmbStatus.Items.Clear();
+                foreach (IncidentStatus st in Enum.GetValues(typeof(IncidentStatus)))
+                {
+                    // Hide "Closed" unless the saved status is already "Resolved"
+                    if (st == IncidentStatus.Closed && _existing != null && !_existing.CanTransitionToClosed)
+                        continue;
+                    _cmbStatus.Items.Add(StatusHelper.ToRussian(st));
+                }
+
+                // Restore selection
+                int idx = _cmbStatus.Items.IndexOf(selectedText);
+                _cmbStatus.SelectedIndex = idx >= 0 ? idx : 0;
             }
-
-            int idx = _cmbStatus.Items.IndexOf(selectedText);
-            _cmbStatus.SelectedIndex = idx >= 0 ? idx : 0;
-
-            _cmbStatus.SelectedIndexChanged += (s, e) => ApplyBusinessRules(); 
+            finally
+            {
+                _applyingRules = false;
+            }
         }
+
+        // ── Save ─────────────────────────────────────────────────────────────
 
         private void SaveIncident(object? sender, EventArgs e)
         {
+            // ── Validate required fields ──────────────────────────────────────
             if (string.IsNullOrWhiteSpace(_txtAuthor.Text) ||
                 string.IsNullOrWhiteSpace(_txtDepartment.Text) ||
                 string.IsNullOrWhiteSpace(_txtDescription.Text))
@@ -300,10 +335,12 @@ namespace IncidentTracker.Forms
                 return;
             }
 
+            // Resolve the chosen status from the displayed text (list may be filtered)
             var chosenText = _cmbStatus.SelectedItem?.ToString() ?? "";
             IncidentStatus newStatus = Enum.GetValues<IncidentStatus>()
                 .FirstOrDefault(s => StatusHelper.ToRussian(s) == chosenText);
 
+            // ── Rule 2: "Closed" only after "Resolved" ────────────────────────
             if (newStatus == IncidentStatus.Closed)
             {
                 if (_existing == null || !_existing.CanTransitionToClosed)
@@ -315,19 +352,21 @@ namespace IncidentTracker.Forms
                     return;
                 }
 
+                // Require a resolution comment when closing
                 if (string.IsNullOrWhiteSpace(_txtNewComment.Text))
                 {
                     MessageBox.Show(
                         "Для перевода инцидента в статус «Закрыт» необходимо добавить комментарий с описанием решения.\n\n" +
                         "Заполните поле комментария и нажмите «Сохранить» снова.",
                         "Требуется комментарий", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    _tabs.SelectedIndex = 0; 
+                    _tabs.SelectedIndex = 0; // switch to comments tab
                     _txtNewComment.Focus();
                     DialogResult = DialogResult.None;
                     return;
                 }
             }
 
+            // ── Persist ───────────────────────────────────────────────────────
             if (_existing == null)
             {
                 var inc = new Incident
@@ -352,6 +391,7 @@ namespace IncidentTracker.Forms
             {
                 var oldStatus = _existing.Status;
 
+                // Only update description if it is not locked (i.e. status was "New")
                 if (!_existing.IsDescriptionLocked)
                     _existing.Description = _txtDescription.Text;
 
@@ -377,6 +417,7 @@ namespace IncidentTracker.Forms
                     });
                 }
 
+                // Save the mandatory closing comment (if present)
                 if (!string.IsNullOrWhiteSpace(_txtNewComment.Text))
                 {
                     _db.AddComment(new Comment
@@ -397,6 +438,7 @@ namespace IncidentTracker.Forms
             }
         }
 
+        // ── Comments ─────────────────────────────────────────────────────────
 
         private void AddComment(object? sender, EventArgs e)
         {
@@ -421,6 +463,7 @@ namespace IncidentTracker.Forms
             LoadComments();
         }
 
+        // ── Attachments ───────────────────────────────────────────────────────
 
         private void AddAttachment(object? sender, EventArgs e)
         {
@@ -459,6 +502,8 @@ namespace IncidentTracker.Forms
             _db.DeleteAttachment(a.Id);
             LoadAttachments();
         }
+
+        // ── List loaders ──────────────────────────────────────────────────────
 
         private void LoadComments()
         {
